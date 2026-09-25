@@ -6,11 +6,8 @@
     "build": "tsc",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {
-    "@higgsfield/client": "latest"
-  },
   "devDependencies": {
-    "typescript": "latest",
-    "@types/node": "latest"
+    "@types/node": "latest",
+    "typescript": "latest"
   }
 }
