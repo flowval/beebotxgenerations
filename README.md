@@ -1,53 +1,85 @@
 # BeebotX Generations
 
-Server-side TypeScript foundation for Higgsfield API generation.
+Model-agnostic server-side TypeScript integration for the Higgsfield REST API.
+
+## Current Higgsfield SDK status
+
+Higgsfield's official Client Libraries page currently lists JavaScript/TypeScript SDK support as "Coming Soon." For TypeScript applications, this project therefore uses Higgsfield's documented REST API directly.
 
 ## Setup
 
-1. Install dependencies:
+Create a local `.env` file:
 
-   ```bash
-   npm install
-   ```
+```env
+HF_KEY=YOUR_KEY:YOUR_SECRET
+HF_WEBHOOK_URL=
+HF_POLL_INTERVAL_MS=2000
+HF_POLL_TIMEOUT_MS=900000
+```
 
-2. Copy `.env.example` to `.env` and set:
+The repository's `.gitignore` excludes `.env`.
 
-   ```
-   HF_CREDENTIALS=KEY_ID:KEY_SECRET
-   ```
+## Use any Higgsfield model
 
-3. Build:
-
-   ```bash
-   npm run build
-   ```
-
-## Model-agnostic API
-
-The integration deliberately accepts a Higgsfield model ID plus a model-specific input object:
+Each model has a unique `model_id`. The client accepts the model ID and passes the model-specific input object through unchanged.
 
 ```ts
-import { generate } from "./src/higgsfield.js";
+import { generate } from "./higgsfield.js";
 
 const result = await generate({
-  model: "bytedance/seedance-2.5/text-to-video",
+  model: "higgsfield-ai/soul/standard",
   input: {
-    prompt: "A cinematic scene at sunset",
-    duration: 5,
-    resolution: "720p",
+    prompt: "A cinematic futuristic city at sunset",
     aspect_ratio: "16:9",
-    output_format: "mp4",
-    generate_audio: true
+    resolution: "2K"
   }
 });
 
-console.log(result.status, result.request_id, result.video?.url);
+console.log(result.status);
+console.log(result.images?.[0]?.url);
+console.log(result.video?.url);
 ```
 
-Use the model-specific Higgsfield API reference for the exact fields supported by each model. The wrapper does not hard-code a model catalog, so adding another model does not require a code change.
+To use another model, replace `model` and provide the fields required by that model's API reference. No client-code change is required.
+
+## Async jobs
+
+Use `submit()` with `wait: false` when you want to persist and manage the request yourself:
+
+```ts
+import { submit, getStatus, cancel } from "./higgsfield.js";
+
+const queued = await submit({
+  model: "higgsfield-ai/soul/standard",
+  input: {
+    prompt: "A cinematic futuristic city at sunset",
+    aspect_ratio: "16:9",
+    resolution: "2K"
+  },
+  wait: false
+});
+
+console.log(queued.request_id);
+
+const status = await getStatus(queued.request_id);
+
+if (status.status === "queued") {
+  await cancel(queued.request_id);
+}
+```
+
+Higgsfield documents these endpoints:
+
+- `POST https://platform.higgsfield.ai/{model_id}`
+- `GET https://platform.higgsfield.ai/requests/{request_id}/status`
+- `POST https://platform.higgsfield.ai/requests/{request_id}/cancel`
+
+## Webhooks
+
+Pass `webhookUrl` to `submit()` or `generate()`. Higgsfield sends final `completed`, `failed`, or `nsfw` notifications to that public HTTPS endpoint.
+
+Use `request_id` for idempotency because webhook delivery may be retried.
 
 ## Security
 
-The official Higgsfield TypeScript SDK is server-side only. Never expose `HF_CREDENTIALS` in browser code or commit it to Git.
-
-For production workloads, a webhook can be supplied instead of relying only on polling. Persist the returned `request_id` if the application needs durable job tracking.
+Keep `HF_KEY` server-side only. Never put it in browser code, frontend bundles, logs, screenshots, or Git commits.
